@@ -20,6 +20,8 @@ reserved = {
     'table': 'TABLE',
     'database': 'DATABASE',
     'show': 'SHOW',
+    'number': 'NUMBER',
+    'string': 'STRING',
 }
 
 tokens = [
@@ -79,8 +81,17 @@ def p_statement_create_table(p):
     if not ACTIVE_DB:
         print('First open or create database')
     else:
-        path_meta = DEFAULT_DB_PATH + '\\' + ACTIVE_DB  + '\\_META.json'
-        data = json.load(open(path_meta, 'r'))
+        path_meta = DEFAULT_DB_PATH + '\\' + ACTIVE_DB + '\\_META.json'
+        data = None
+        if os.path.exists(path_meta):
+            try:
+                data = json.load(open(path_meta, 'r'))
+                for table in data:
+                    if table['table_name'] == p[3]:
+                        print('Table already exists')
+                        return 1
+            except json.JSONDecodeError:
+                print('Database is empty')
         new_data = {
             'table_name': p[3],
             'columns': p[4],
@@ -123,26 +134,31 @@ def p_statement_create_db(p):
         ACTIVE_DB = p[3]
 
 
-
 def p_columns(p):
     "columns : '(' list ')'"
     p[0] = p[2]
 
 
 def p_list(p):
-    '''list : identifier
-            | list "," identifier'''
-    if len(p) == 2:
-        p[0] = [p[1]]
+    '''list : identifier type
+            | list "," identifier type'''
+    if len(p) == 3:
+        p[0] = [{'name': p[1], 'type': p[2]}]
     elif isinstance(p[1], list):
-        p[1].append(p[3])
+        p[1].append({'name': p[3], 'type': p[4]})
         p[0] = p[1]
     else:
         p[0] = None
 
 
 def p_identifier(p):
-    r'identifier : IDENTIFIER'
+    r'''identifier : IDENTIFIER'''
+    p[0] = p[1]
+
+
+def p_type(p):
+    '''type : NUMBER
+            | STRING'''
     p[0] = p[1]
 
 
