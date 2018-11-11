@@ -4,7 +4,8 @@
 # A simple calculator with variables.   This is from O'Reilly's
 # "Lex and Yacc", p. 63.
 # -----------------------------------------------------------------------------
-
+import json
+import os
 import sys
 import ply.lex as lex
 import ply.yacc as yacc
@@ -17,6 +18,8 @@ if sys.version_info[0] >= 3:
 reserved = {
     'create': 'CREATE',
     'table': 'TABLE',
+    'database': 'DATABASE',
+    'show': 'SHOW',
 }
 
 tokens = [
@@ -54,10 +57,71 @@ precedence = ()
 # dictionary of names
 names = {}
 
+DEFAULT_DB_PATH = 'C:\mbdb'
+ACTIVE_DB = 'hui'
 
-def p_statement_create(p):
-    ''' statement : CREATE TABLE identifier columns '''
+print('Your databases are located in ', DEFAULT_DB_PATH)
+print('Would you like to change it? (y/n)')
+if input() != 'n':
+    print('Input your new DBs location:')
+    path = input()
+    if not os.path.exists(path):
+        os.mkdir(input())
+else:
+    if not os.path.exists(DEFAULT_DB_PATH):
+        os.mkdir(DEFAULT_DB_PATH)
+
+
+def p_statement_create_table(p):
+    '''statement : CREATE TABLE identifier columns'''
+
     print([i for i in p])
+    if not ACTIVE_DB:
+        print('First open or create database')
+    else:
+        path_meta = DEFAULT_DB_PATH + '\\' + ACTIVE_DB  + '\\_META.json'
+        data = json.load(open(path_meta, 'r'))
+        new_data = {
+            'table_name': p[3],
+            'columns': p[4],
+        }
+        with open(path_meta, 'w') as metafile:
+            if isinstance(data, list):
+                data.append(new_data)
+                json.dump(data, metafile)
+            else:
+                json.dump([new_data], metafile)
+
+
+def p_statement_show_create_table(p):
+    '''statement : SHOW CREATE TABLE identifier'''
+
+    print([i for i in p])
+    if not ACTIVE_DB:
+        print('First open or create database')
+    else:
+        path_meta = DEFAULT_DB_PATH + '\\' + ACTIVE_DB  + '\\_META.json'
+        data = json.load(open(path_meta, 'r'))
+        for table in data:
+            if table['table_name'] == p[4]:
+                print('create table ' + p[4] + ' (' + ', '.join(table['columns']) + ')')
+
+
+def p_statement_create_db(p):
+    '''statement : CREATE DATABASE identifier'''
+
+    print([i for i in p])
+    path = DEFAULT_DB_PATH + '\\' + p[3]
+    if not os.path.exists(path):
+        os.mkdir(path)
+    else:
+        print('Database already exists')
+
+    print('Open it now? (y/n)')
+    if input() != 'n':
+        global ACTIVE_DB
+        ACTIVE_DB = p[3]
+
 
 
 def p_columns(p):
@@ -95,7 +159,7 @@ yacc.yacc()
 def main():
     while 1:
         try:
-            s = raw_input('calc > ')
+            s = raw_input('query > ')
         except EOFError:
             break
         if not s:
