@@ -115,7 +115,7 @@ def p_statement_show_create_table(p):
         data = json.load(open(path_meta, 'r'))
         for table in data:
             if table['table_name'] == p[4]:
-                print('create table ' + p[4] + ' (' + ', '.join([' '.join(list(i.values()))) for i in table['columns']]) + ')')
+                print('create table ' + p[4] + ' (' + ', '.join([' '.join(list(i.values())) for i in table['columns']]) + ')')
 
 
 def p_statement_create_db(p):
