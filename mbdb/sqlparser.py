@@ -8,6 +8,12 @@ reserved = {
     'show': 'SHOW',
     'number': 'NUMBER',
     'string': 'STRING',
+    'insert': 'INSERT',
+    'into': 'INTO',
+    'values': 'VALUES',
+    'select': 'SELECT',
+    'from': 'FROM',
+    '*': 'ALL',
 }
 
 tokens = [
@@ -21,7 +27,7 @@ t_ignore = " \t"
 
 
 def t_IDENTIFIER(t):
-    r'[a-zA-Z_][a-zA-Z0-9_]*'
+    r'[a-zA-Zа-яА-Я_][a-zA-Zа-яА-Я0-9_]*|\d+'
     t.type = reserved.get(t.value, 'IDENTIFIER')  # Check for reserved words
     return t
 
@@ -44,6 +50,28 @@ precedence = ()
 
 # dictionary of names
 names = {}
+
+
+def p_statement_insert(p):
+    '''statement : INSERT INTO identifier VALUES '(' values ')' '''
+
+    # insert into horse values (pharaoh, 12)
+
+    print([i for i in p])
+    p[0] = p[1:]
+
+
+def p_statement_values(p):
+    '''values : identifier
+              | values ',' identifier'''
+
+    if len(p) == 2:
+        p[0] = [p[1]]
+    elif isinstance(p[1], list):
+        p[1].append(p[3])
+        p[0] = p[1]
+    else:
+        p[0] = None
 
 
 def p_statement_create_table(p):

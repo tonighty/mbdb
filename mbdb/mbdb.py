@@ -30,6 +30,9 @@ class mbdb():
         elif sql[0] == 'show':
             self._show_create_table(sql[3])
 
+        elif sql[0] == 'insert':
+            self._insert_into_table(sql[2], sql[5])
+
     def _check_for_db(self):
         if not self._db_name:
             raise Exception('First open or create database')
@@ -65,6 +68,9 @@ class mbdb():
                 else:
                     json.dump([new_data], metafile)
 
+            path_table = os.path.join(DEFAULT_DB_PATH, self._db_name, name + '.json')
+            open(path_table, 'w')
+
     def _show_create_table(self, name):
         if not self._db_name:
             print('First open or create database')
@@ -81,3 +87,36 @@ class mbdb():
             print('First open or create database')
         else:
             path_meta = os.path.join(DEFAULT_DB_PATH, self._db_name, '_META.json')
+            values = fields
+            path_table = os.path.join(DEFAULT_DB_PATH, self._db_name, name + '.json')
+            data_scructure = None
+            if os.path.exists(path_meta):
+                try:
+                    meta_data = json.load(open(path_meta, 'r'))
+                    for table in meta_data:
+                        if table['table_name'] == name:
+                            data_scructure = table['columns']
+                except json.JSONDecodeError:
+                    print('Create table first ffs')
+                    return 1
+            if data_scructure == None:
+                print('Create table first ffs')
+                return 1
+            table_data = None
+            if os.path.exists(path_table):
+                try:
+                    table_data = json.load(open(path_table, 'r'))
+                except json.JSONDecodeError:
+                    print('Creating table file...')
+            new_data = {}
+            for index, item in enumerate(data_scructure):
+                if list(item.values())[1] == 'number':
+                    values[index] = int(values[index])
+                new_data.update({list(item.values())[0]: values[index]})
+            with open(path_table, 'w') as table_file:
+                if isinstance(table_data, list):
+                    table_data.append(new_data)
+                    json.dump(table_data, table_file, ensure_ascii=False)
+                else:
+                    print(new_data)
+                    json.dump([new_data], table_file, ensure_ascii=False)
