@@ -20,14 +20,14 @@ tokens = [
              'IDENTIFIER',
          ] + list(reserved.values())
 
-literals = [',', '(', ')']
+literals = [',', '(', ')', '%']
 
 # Tokens
 t_ignore = " \t"
 
 
 def t_IDENTIFIER(t):
-    r'[a-zA-Zа-яА-Я_][a-zA-Zа-яА-Я0-9_]*|\d+'
+    r'[a-zA-Zа-яА-Я_][a-zA-Zа-яА-Я0-9_]*|\d+|\*'
     t.type = reserved.get(t.value, 'IDENTIFIER')  # Check for reserved words
     return t
 
@@ -52,12 +52,29 @@ precedence = ()
 names = {}
 
 
+def p_statement_select(p):
+    '''statement : SELECT s_columns FROM identifier
+                 | SELECT ALL FROM identifier'''
+
+    p[0] = p[1:]
+
+
+def p_s_columns(p):
+    '''s_columns : identifier
+                 | s_columns ',' identifier'''
+
+    if len(p) == 2:
+        p[0] = [p[1]]
+    elif isinstance(p[1], list):
+        p[1].append(p[3])
+        p[0] = p[1]
+    else:
+        p[0] = None
+
+
 def p_statement_insert(p):
     '''statement : INSERT INTO identifier VALUES '(' values ')' '''
 
-    # insert into horse values (pharaoh, 12)
-
-    print([i for i in p])
     p[0] = p[1:]
 
 
@@ -77,21 +94,18 @@ def p_statement_values(p):
 def p_statement_create_table(p):
     '''statement : CREATE TABLE identifier columns'''
 
-    print([i for i in p])
     p[0] = p[1:]
 
 
 def p_statement_show_create_table(p):
     '''statement : SHOW CREATE TABLE identifier'''
 
-    print([i for i in p])
     p[0] = p[1:]
 
 
 def p_statement_create_db(p):
     '''statement : CREATE DATABASE identifier'''
 
-    print([i for i in p])
     p[0] = p[1:]
 
 
@@ -135,5 +149,4 @@ yacc.yacc()
 
 def parse(statement):
     sql = yacc.parse(statement)
-    print(sql)
     return sql

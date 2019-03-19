@@ -20,18 +20,22 @@ class mbdb():
 
     def exec(self, statement):
         sql = parse(statement)
+        print('TEST ' + str(sql))
 
-        if sql == None:
-            raise Exception('Error')
+        if sql is None:
+            return
 
         if sql[0] == 'create':
-            self._create_table(sql[2], sql[3])
+            return self._create_table(sql[2], sql[3])
 
         elif sql[0] == 'show':
-            self._show_create_table(sql[3])
+            return self._show_create_table(sql[3])
 
         elif sql[0] == 'insert':
-            self._insert_into_table(sql[2], sql[5])
+            return self._insert_into_table(sql[2], sql[5])
+
+        elif sql[0] == 'select':
+            return self._select_from_table(sql[3], sql[1])
 
     def _check_for_db(self):
         if not self._db_name:
@@ -120,3 +124,22 @@ class mbdb():
                 else:
                     print(new_data)
                     json.dump([new_data], table_file, ensure_ascii=False)
+
+    def _select_from_table(self, name, columns):
+        table_path = os.path.join(DEFAULT_DB_PATH, self._db_name, name + '.json')
+        result = []
+        with open(table_path) as table_file:
+            data = json.load(table_file)
+            if columns == '*':
+                return data
+
+            for row in data:
+                row_res = {}
+                for column in columns:
+                    val = row.get(column)
+                    if val:
+                        row_res[column] = val
+                if row_res != {}:
+                    result.append(row_res)
+
+        return result
