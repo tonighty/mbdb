@@ -5,11 +5,10 @@ from mbdb.sqlparser import parse
 
 sys.path.insert(0, "../..")
 
-if sys.version_info[0] >= 3:
-    raw_input = input
+DEFAULT_DB_PATH = os.path.join('mbdb-test-db')
 
-DEFAULT_DB_PATH = os.path.join(os.sep, 'mbdb')
-
+if not os.path.exists('mbdb-test-db'):
+    os.mkdir('mbdb-test-db')
 
 class mbdb():
 
