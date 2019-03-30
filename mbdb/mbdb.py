@@ -20,7 +20,7 @@ class mbdb():
 
     def exec(self, statement):
         sql = parse(statement)
-        print('TEST ' + str(sql))
+        # print('TEST ' + str(sql))
 
         if sql is None:
             return
@@ -54,10 +54,12 @@ class mbdb():
             data = None
             if os.path.exists(path_meta):
                 try:
-                    data = json.load(open(path_meta, 'r'))
+                    meta = open(path_meta, 'r')
+                    data = json.load(meta)
+                    meta.close()
                     for table in data:
                         if table['table_name'] == name:
-                            print('Table already exists')
+                            # print('Table already exists')
                             return 1
                 except json.JSONDecodeError:
                     print('Database is empty')
@@ -73,17 +75,19 @@ class mbdb():
                     json.dump([new_data], metafile)
 
             path_table = os.path.join(DEFAULT_DB_PATH, self._db_name, name + '.json')
-            open(path_table, 'w')
+            open(path_table, 'w').close()
 
     def _show_create_table(self, name):
         if not self._db_name:
             print('First open or create database')
         else:
             path_meta = os.path.join(DEFAULT_DB_PATH, self._db_name, '_META.json')
-            data = json.load(open(path_meta, 'r'))
+            meta = open(path_meta, 'r')
+            data = json.load(meta)
+            meta.close()
             for table in data:
                 if table['table_name'] == name:
-                    print('create table ' + name + ' (' + ', '.join(
+                    return str('create table ' + name + ' (' + ', '.join(
                         [' '.join(list(i.values())) for i in table['columns']]) + ')')
 
     def _insert_into_table(self, name, fields):

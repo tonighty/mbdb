@@ -1,10 +1,20 @@
 from mbdb.mbdb import mbdb
+import unittest
 
-db = mbdb('mega')
 
-db.exec('create table users (id number, name string)')
-db.exec('insert into users values (1, John)')
-db.exec('insert into users values (2, Dick)')
-db.exec('insert into users values (3, Richard)')
-rows = db.exec('select * from users')
-print(rows)
+class TestDB(unittest.TestCase):
+
+    def test_show_create_table(self):
+        db = mbdb('test')
+
+        query = 'create table users (id number, name string)'
+        db.exec(query)
+        self.assertEqual(db.exec('show create table users'), query)
+
+        query = 'create table products (id number, name string, photo string, description string)'
+        db.exec(query)
+        self.assertEqual(db.exec('show create table products'), query)
+
+
+if __name__ == '__main__':
+    unittest.main()
