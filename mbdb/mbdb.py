@@ -5,17 +5,22 @@ from mbdb.sqlparser import parse
 
 sys.path.insert(0, "../..")
 
-DEFAULT_DB_PATH = os.path.join('mbdb-test-db')
+DEFAULT_DB_PATH = os.path.join('mbdb-db')
 
-if not os.path.exists('mbdb-test-db'):
-    os.mkdir('mbdb-test-db')
 
 class mbdb():
 
-    def __init__(self, name):
+    def __init__(self, name, path=DEFAULT_DB_PATH):
+
+        self._db_path = path
+        if not os.path.exists(self._db_path):
+            os.mkdir(self._db_path)
 
         self._db_name = name
         self._create_database()
+
+    def get_database_path(self):
+        return self._db_path
 
     def exec(self, statement):
         sql = parse(statement)
@@ -41,7 +46,7 @@ class mbdb():
             raise Exception('First open or create database')
 
     def _create_database(self):
-        path = os.path.join(DEFAULT_DB_PATH, self._db_name)
+        path = os.path.join(self._db_path, self._db_name)
         if not os.path.exists(path):
             os.mkdir(path)
 
@@ -49,7 +54,7 @@ class mbdb():
         if not self._db_name:
             print('First open or create database')
         else:
-            path_meta = os.path.join(DEFAULT_DB_PATH, self._db_name, '_META.json')
+            path_meta = os.path.join(self._db_path, self._db_name, '_META.json')
             data = None
             if os.path.exists(path_meta):
                 try:
@@ -73,14 +78,14 @@ class mbdb():
                 else:
                     json.dump([new_data], metafile)
 
-            path_table = os.path.join(DEFAULT_DB_PATH, self._db_name, name + '.json')
+            path_table = os.path.join(self._db_path, self._db_name, name + '.json')
             open(path_table, 'w').close()
 
     def _show_create_table(self, name):
         if not self._db_name:
             print('First open or create database')
         else:
-            path_meta = os.path.join(DEFAULT_DB_PATH, self._db_name, '_META.json')
+            path_meta = os.path.join(self._db_path, self._db_name, '_META.json')
             meta = open(path_meta, 'r')
             data = json.load(meta)
             meta.close()
@@ -93,28 +98,34 @@ class mbdb():
         if not self._db_name:
             print('First open or create database')
         else:
-            path_meta = os.path.join(DEFAULT_DB_PATH, self._db_name, '_META.json')
+            path_meta = os.path.join(self._db_path, self._db_name, '_META.json')
             values = fields
-            path_table = os.path.join(DEFAULT_DB_PATH, self._db_name, name + '.json')
+            path_table = os.path.join(self._db_path, self._db_name, name + '.json')
             data_scructure = None
             if os.path.exists(path_meta):
                 try:
-                    meta_data = json.load(open(path_meta, 'r'))
+                    meta = open(path_meta, 'r')
+                    meta_data = json.load(meta)
+                    meta.close()
                     for table in meta_data:
                         if table['table_name'] == name:
                             data_scructure = table['columns']
                 except json.JSONDecodeError:
                     print('Create table first ffs')
                     return 1
-            if data_scructure == None:
+            if data_scructure is None:
                 print('Create table first ffs')
                 return 1
             table_data = None
             if os.path.exists(path_table):
+                table = None
                 try:
-                    table_data = json.load(open(path_table, 'r'))
+                    table = open(path_table, 'r')
+                    table_data = json.load(table)
                 except json.JSONDecodeError:
                     print('Creating table file...')
+                finally:
+                    table.close()
             new_data = {}
             for index, item in enumerate(data_scructure):
                 if list(item.values())[1] == 'number':
@@ -125,11 +136,10 @@ class mbdb():
                     table_data.append(new_data)
                     json.dump(table_data, table_file, ensure_ascii=False)
                 else:
-                    print(new_data)
                     json.dump([new_data], table_file, ensure_ascii=False)
 
     def _select_from_table(self, name, columns):
-        table_path = os.path.join(DEFAULT_DB_PATH, self._db_name, name + '.json')
+        table_path = os.path.join(self._db_path, self._db_name, name + '.json')
         result = []
         with open(table_path) as table_file:
             data = json.load(table_file)
