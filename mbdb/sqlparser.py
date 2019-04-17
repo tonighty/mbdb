@@ -13,12 +13,15 @@ reserved = {
     'values': 'VALUES',
     'select': 'SELECT',
     'from': 'FROM',
-    '*': 'ALL',
+    'update': 'UPDATE',
+    'delete': 'DELETE',
+    'where': 'WHERE',
 }
 
 tokens = [
-             'IDENTIFIER',
-         ] + list(reserved.values())
+    'IDENTIFIER',
+    'OPERATOR',
+] + list(reserved.values())
 
 literals = [',', '(', ')', '%']
 
@@ -29,6 +32,11 @@ t_ignore = " \t"
 def t_IDENTIFIER(t):
     r'[a-zA-Zа-яА-Я_][a-zA-Zа-яА-Я0-9_]*|\d+|\*'
     t.type = reserved.get(t.value, 'IDENTIFIER')  # Check for reserved words
+    return t
+
+
+def t_OPERATOR(t):
+    r'=|!=|>|>=|<|<='
     return t
 
 
@@ -52,9 +60,27 @@ precedence = ()
 names = {}
 
 
+def p_statement_delete(p):
+    '''statement : DELETE FROM identifier WHERE condition'''
+
+    p[0] = p[1:]
+
+
+def p_condition(p):
+    '''condition : identifier operator identifier'''
+
+    p[0] = [p[1], p[2], p[3]]
+
+
+def p_operator(p):
+    r'''operator : OPERATOR'''
+
+    p[0] = p[1]
+
+
 def p_statement_select(p):
     '''statement : SELECT s_columns FROM identifier
-                 | SELECT ALL FROM identifier'''
+                 | SELECT s_columns FROM identifier WHERE condition'''
 
     p[0] = p[1:]
 

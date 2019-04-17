@@ -24,7 +24,6 @@ class mbdb():
 
     def exec(self, statement):
         sql = parse(statement)
-        # print('TEST ' + str(sql))
 
         if sql is None:
             return
@@ -39,7 +38,13 @@ class mbdb():
             return self._insert_into_table(sql[2], sql[5])
 
         elif sql[0] == 'select':
-            return self._select_from_table(sql[3], sql[1])
+            condition = None
+            if len(sql) == 6:
+                condition = sql[5]
+            return self._select_from_table(sql[3], sql[1], condition)
+
+        elif sql[0] == 'delete':
+            return self._delete_from_table(sql[2], sql[4])
 
     def _check_for_db(self):
         if not self._db_name:
@@ -138,7 +143,7 @@ class mbdb():
                 else:
                     json.dump([new_data], table_file, ensure_ascii=False)
 
-    def _select_from_table(self, name, columns):
+    def _select_from_table(self, name, columns, condition=None):
         table_path = os.path.join(self._db_path, self._db_name, name + '.json')
         result = []
         with open(table_path) as table_file:
@@ -150,9 +155,45 @@ class mbdb():
                 row_res = {}
                 for column in columns:
                     val = row.get(column)
-                    if val:
+                    if val and (condition is None or condition[0] == column and self._handle_condition(val, condition[1], condition[2])):
                         row_res[column] = val
                 if row_res != {}:
                     result.append(row_res)
 
         return result
+
+    def _delete_from_table(self, name, condition):
+        table_path = os.path.join(self._db_path, self._db_name, name + '.json')
+
+        with open(table_path, 'r') as table_file:
+            data = json.load(table_file)
+
+        with open(table_path, 'w') as table_file:
+            column = condition[0]
+            operator = condition[1]
+            value = condition[2]
+
+            for item in data:
+                if self._handle_condition(item[column], operator, value):
+                    del item[column]
+
+            json.dump(data, table_file, ensure_ascii=False)
+
+    def _handle_condition(self, value1, operator, value2):
+        if operator == '=':
+            return value1 == type(value1)(value2)
+
+        elif operator == '!=':
+            return value1 != type(value1)(value2)
+
+        elif operator == '>':
+            return value1 > type(value1)(value2)
+
+        elif operator == '>=':
+            return value1 >= type(value1)(value2)
+
+        elif operator == '<':
+            return value1 < type(value1)(value2)
+
+        elif operator == '<=':
+            return value1 <= type(value1)(value2)

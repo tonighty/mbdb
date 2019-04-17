@@ -22,13 +22,27 @@ class TestDB(unittest.TestCase):
         query = 'create table products (id number, name string, photo string, description string)'
         self._db.exec(query)
 
-        self._db.exec('insert into products values (1, CocaCola, base64, norm)')
+        self._db.exec('insert into products values (1, CocaCola, base64, good)')
+        self._db.exec('insert into products values (2, Pepsi, base64, bad)')
 
         value = self._db.exec('select id from products')
         self.assertEqual(1, value[0]['id'])
 
         value = self._db.exec('select name from products')
         self.assertEqual('CocaCola', value[0]['name'])
+
+        value = self._db.exec('select id from products where id = 2')
+        self.assertEqual(2, value[0]['id'])
+
+    def test_delete(self):
+        self._db.exec('create table products (id number)')
+
+        for i in range(10):
+            self._db.exec('insert into products values (%d)' % i)
+
+        self._db.exec('delete from products where id > 5')
+
+        self.assertEqual(len(self._db.exec('select id from products')), 5)
 
     def tearDown(self):
         shutil.rmtree(self._db.get_database_path())
