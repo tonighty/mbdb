@@ -16,6 +16,7 @@ reserved = {
     'update': 'UPDATE',
     'delete': 'DELETE',
     'where': 'WHERE',
+    'set': 'SET',
 }
 
 tokens = [
@@ -23,7 +24,7 @@ tokens = [
     'OPERATOR',
 ] + list(reserved.values())
 
-literals = [',', '(', ')', '%']
+literals = [',', '(', ')', '%', '=']
 
 # Tokens
 t_ignore = " \t"
@@ -36,7 +37,7 @@ def t_IDENTIFIER(t):
 
 
 def t_OPERATOR(t):
-    r'=|!=|>|>=|<|<='
+    r'==|!=|>|>=|<|<='
     return t
 
 
@@ -58,6 +59,25 @@ precedence = ()
 
 # dictionary of names
 names = {}
+
+
+def p_statement_update(p):
+    '''statement : UPDATE identifier SET update_values WHERE condition'''
+
+    p[0] = p[1:]
+
+
+def p_update_values(p):
+    '''update_values : identifier '=' identifier
+                     | update_values ',' identifier '=' identifier'''
+
+    if len(p) == 4:
+        p[0] = {p[1]: p[3]}
+    elif isinstance(p[1], dict):
+        p[1][p[3]] = p[5]
+        p[0] = p[1]
+    else:
+        p[0] = None
 
 
 def p_statement_delete(p):

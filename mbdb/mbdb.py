@@ -46,6 +46,9 @@ class mbdb():
         elif sql[0] == 'delete':
             return self._delete_from_table(sql[2], sql[4])
 
+        elif sql[0] == 'update':
+            return self._update_table(sql[1], sql[3], sql[5])
+
     def _check_for_db(self):
         if not self._db_name:
             raise Exception('First open or create database')
@@ -179,8 +182,27 @@ class mbdb():
 
             json.dump(data, table_file, ensure_ascii=False)
 
+    def _update_table(self, name, values, condition):
+        table_path = os.path.join(self._db_path, self._db_name, name + '.json')
+
+        with open(table_path, 'r') as table_file:
+            data = json.load(table_file)
+
+        with open(table_path, 'w') as table_file:
+            column = condition[0]
+            operator = condition[1]
+            value = condition[2]
+
+            for row in data:
+                if self._handle_condition(row[column], operator, value):
+                    for column in row:
+                        if values[column]:
+                            row[column] = type(row[column])(values[column])
+
+            json.dump(data, table_file, ensure_ascii=False)
+
     def _handle_condition(self, value1, operator, value2):
-        if operator == '=':
+        if operator == '==':
             return value1 == type(value1)(value2)
 
         elif operator == '!=':
