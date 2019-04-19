@@ -17,12 +17,15 @@ class mbdb():
             os.mkdir(self._db_path)
 
         self._db_name = name
+        self._meta_path = os.path.join(self._db_path, self._db_name, '_META.json')
         self._create_database()
 
     def get_database_path(self):
         return self._db_path
 
     def exec(self, statement):
+        self._check_for_db()
+
         sql = parse(statement)
 
         if sql is None:
@@ -51,7 +54,24 @@ class mbdb():
 
     def _check_for_db(self):
         if not self._db_name:
-            raise Exception('First open or create database')
+            raise Exception('Database does not exist')
+
+    def _is_legal_table(self, name):
+        if self._is_legal_file(self._meta_path):
+            with open(self._meta_path, 'r') as meta_file:
+                data = json.load(meta_file)
+            for table in data:
+                if table['table_name'] == name:
+                    return True
+
+        return False
+
+    def _get_table_path(self, name):
+        return os.path.join(self._db_path, self._db_name, name + '.json')
+
+    @staticmethod
+    def _is_legal_file(path):
+        return os.path.exists(path) and os.path.getsize(path) > 0
 
     def _create_database(self):
         path = os.path.join(self._db_path, self._db_name)
@@ -59,97 +79,84 @@ class mbdb():
             os.mkdir(path)
 
     def _create_table(self, name, fields):
-        if not self._db_name:
-            print('First open or create database')
-        else:
-            path_meta = os.path.join(self._db_path, self._db_name, '_META.json')
-            data = None
-            if os.path.exists(path_meta):
-                try:
-                    meta = open(path_meta, 'r')
-                    data = json.load(meta)
-                    meta.close()
-                    for table in data:
-                        if table['table_name'] == name:
-                            # print('Table already exists')
-                            return 1
-                except json.JSONDecodeError:
-                    print('Database is empty')
-            new_data = {
-                'table_name': name,
-                'columns': fields,
-            }
-            with open(path_meta, 'w') as metafile:
-                if isinstance(data, list):
-                    data.append(new_data)
-                    json.dump(data, metafile)
-                else:
-                    json.dump([new_data], metafile)
+        data = None
 
-            path_table = os.path.join(self._db_path, self._db_name, name + '.json')
-            open(path_table, 'w').close()
-
-    def _show_create_table(self, name):
-        if not self._db_name:
-            print('First open or create database')
-        else:
-            path_meta = os.path.join(self._db_path, self._db_name, '_META.json')
-            meta = open(path_meta, 'r')
-            data = json.load(meta)
-            meta.close()
+        if self._is_legal_file(self._meta_path):
+            with open(self._meta_path, 'r') as meta_file:
+                data = json.load(meta_file)
             for table in data:
                 if table['table_name'] == name:
-                    return str('create table ' + name + ' (' + ', '.join(
-                        [' '.join(list(i.values())) for i in table['columns']]) + ')')
+                    raise Exception('Table already exists')
+
+        new_data = {
+            'table_name': name,
+            'columns': fields,
+        }
+
+        with open(self._meta_path, 'w') as meta_file:
+            if isinstance(data, list):
+                data.append(new_data)
+                json.dump(data, meta_file)
+            else:
+                json.dump([new_data], meta_file)
+
+        path_table = self._get_table_path(name)
+        open(path_table, 'w').close()
+
+    def _show_create_table(self, name):
+        meta = open(self._meta_path, 'r')
+        data = json.load(meta)
+        meta.close()
+
+        for table in data:
+            if table['table_name'] == name:
+                return str('create table ' + name + ' (' + ', '.join(
+                    [' '.join(list(i.values())) for i in table['columns']]) + ')')
 
     def _insert_into_table(self, name, fields):
-        if not self._db_name:
-            print('First open or create database')
-        else:
-            path_meta = os.path.join(self._db_path, self._db_name, '_META.json')
-            values = fields
-            path_table = os.path.join(self._db_path, self._db_name, name + '.json')
-            data_scructure = None
-            if os.path.exists(path_meta):
-                try:
-                    meta = open(path_meta, 'r')
-                    meta_data = json.load(meta)
-                    meta.close()
-                    for table in meta_data:
-                        if table['table_name'] == name:
-                            data_scructure = table['columns']
-                except json.JSONDecodeError:
-                    print('Create table first ffs')
-                    return 1
-            if data_scructure is None:
-                print('Create table first ffs')
-                return 1
-            table_data = None
-            if os.path.exists(path_table):
-                table = None
-                try:
-                    table = open(path_table, 'r')
-                    table_data = json.load(table)
-                except json.JSONDecodeError:
-                    print('Creating table file...')
-                finally:
-                    table.close()
-            new_data = {}
-            for index, item in enumerate(data_scructure):
-                if list(item.values())[1] == 'number':
-                    values[index] = int(values[index])
-                new_data.update({list(item.values())[0]: values[index]})
-            with open(path_table, 'w') as table_file:
-                if isinstance(table_data, list):
-                    table_data.append(new_data)
-                    json.dump(table_data, table_file, ensure_ascii=False)
-                else:
-                    json.dump([new_data], table_file, ensure_ascii=False)
+        values = fields
+        table_path = self._get_table_path(name)
+
+        data_structure = None
+        if self._is_legal_file(self._meta_path):
+            meta = open(self._meta_path, 'r')
+            meta_data = json.load(meta)
+            meta.close()
+            for table in meta_data:
+                if table['table_name'] == name:
+                    data_structure = table['columns']
+
+        if data_structure is None:
+            raise Exception('Table does not exists')
+
+        table_data = None
+        if self._is_legal_file(table_path):
+            table = open(table_path, 'r')
+            table_data = json.load(table) if table is not None else None
+            table.close()
+
+        new_data = {}
+        for index, item in enumerate(data_structure):
+            if list(item.values())[1] == 'number':
+                values[index] = int(values[index])
+            new_data.update({list(item.values())[0]: values[index]})
+
+        with open(table_path, 'w') as table_file:
+            if isinstance(table_data, list):
+                table_data.append(new_data)
+                json.dump(table_data, table_file, ensure_ascii=False)
+            else:
+                json.dump([new_data], table_file, ensure_ascii=False)
 
     def _select_from_table(self, name, columns, condition=None):
-        table_path = os.path.join(self._db_path, self._db_name, name + '.json')
+        if not self._is_legal_table(name):
+            raise Exception('Table does not exists')
+
+        if not self._is_legal_file(self._get_table_path(name)):
+            return None
+
         result = []
-        with open(table_path) as table_file:
+        with open(self._get_table_path(name)) as table_file:
             data = json.load(table_file)
             if columns == '*':
                 return data
@@ -166,7 +173,7 @@ class mbdb():
         return result
 
     def _delete_from_table(self, name, condition):
-        table_path = os.path.join(self._db_path, self._db_name, name + '.json')
+        table_path = self._get_table_path(name)
 
         with open(table_path, 'r') as table_file:
             data = json.load(table_file)
