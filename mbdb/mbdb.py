@@ -57,12 +57,10 @@ class mbdb():
 			raise Exception('Database does not exist')
 
 	def _is_legal_table(self, name):
-		if self._is_legal_file(self._meta_path):
-			with open(self._meta_path, 'r') as meta_file:
-				data = json.load(meta_file)
-			for table in data:
-				if table['table_name'] == name:
-					return True
+		data = self._read_meta()
+		for table in data:
+			if table['table_name'] == name:
+				return True
 
 		return False
 
@@ -87,6 +85,20 @@ class mbdb():
 
 	def _read_table(self, name):
 		return self._read_json(self._get_table_path(name))
+
+	def _check_column(self, name, column):
+		if column is None:
+			return
+
+		data = self._read_meta()
+		for table in data:
+			if table['table_name'] == name:
+				for field in table['columns']:
+					if field['name'] == column:
+						return
+
+		raise Exception('Column "%s" does not exists in "%s"' % (column, name))
+
 
 	@staticmethod
 	def _is_legal_file(path):
@@ -127,6 +139,8 @@ class mbdb():
 				return str('create table ' + name + ' (' + ', '.join(
 					[' '.join(list(i.values())) for i in table['columns']]) + ')')
 
+		raise Exception('Table does not exists')
+
 	def _insert_into_table(self, name, fields):
 		table_path = self._get_table_path(name)
 
@@ -157,6 +171,12 @@ class mbdb():
 	def _select_from_table(self, name, columns, condition = None):
 		self._check_table_readability(name)
 
+		if condition is not None:
+			self._check_column(name, condition[0])
+
+		for column in columns:
+			self._check_column(name, column)
+
 		data = self._read_table(name)
 
 		if columns == '*':
@@ -176,6 +196,10 @@ class mbdb():
 
 	def _delete_from_table(self, name, condition):
 		self._check_table_readability(name)
+
+		if condition is not None:
+			self._check_column(name, condition[0])
+
 		table_path = self._get_table_path(name)
 
 		data = self._read_table(name)
@@ -193,6 +217,10 @@ class mbdb():
 
 	def _update_table(self, name, values, condition):
 		self._check_table_readability(name)
+
+		if condition is not None:
+			self._check_column(name, condition[0])
+
 		table_path = self._get_table_path(name)
 
 		data = self._read_table(name)
@@ -212,20 +240,23 @@ class mbdb():
 
 	@staticmethod
 	def _handle_condition(value1, operator, value2):
-		if operator == '==':
-			return value1 == type(value1)(value2)
+		try:
+			if operator == '==':
+				return value1 == type(value1)(value2)
 
-		elif operator == '!=':
-			return value1 != type(value1)(value2)
+			elif operator == '!=':
+				return value1 != type(value1)(value2)
 
-		elif operator == '>':
-			return value1 > type(value1)(value2)
+			elif operator == '>':
+				return value1 > type(value1)(value2)
 
-		elif operator == '>=':
-			return value1 >= type(value1)(value2)
+			elif operator == '>=':
+				return value1 >= type(value1)(value2)
 
-		elif operator == '<':
-			return value1 < type(value1)(value2)
+			elif operator == '<':
+				return value1 < type(value1)(value2)
 
-		elif operator == '<=':
-			return value1 <= type(value1)(value2)
+			elif operator == '<=':
+				return value1 <= type(value1)(value2)
+		except ValueError:
+			raise ValueError('"%s" must be type of "%s"' % (value2, type(value1)))

@@ -47,8 +47,7 @@ def t_newline(t):
 
 
 def t_error(t):
-    print("Illegal character '%s'" % t.value[0])
-    t.lexer.skip(1)
+    raise SyntaxError("Illegal character '%s'" % t.value[0])
 
 
 # Build the lexer
@@ -185,9 +184,9 @@ def p_type(p):
 
 def p_error(p):
     if p:
-        print("Syntax error at '%s'" % p.value)
+        raise SyntaxError("Syntax error at '%s'" % p.value)
     else:
-        print("Syntax error at EOF")
+        raise SyntaxError("Syntax error at EOF")
 
 
 yacc.yacc()

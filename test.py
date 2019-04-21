@@ -7,12 +7,18 @@ import unittest
 class TestDB(unittest.TestCase):
 
 	def setUp(self):
-		self._db = mbdb('test-table')
+		self._db = mbdb('test-db')
 
 	def test_show_create_table(self):
 		query = 'create table users (id number, name string)'
 		self._db.exec(query)
 		self.assertEqual(self._db.exec('show create table users'), query)
+
+		with self.assertRaisesRegex(Exception, 'Table already exists'):
+			self._db.exec(query)
+
+		with self.assertRaises(SyntaxError):
+			self._db.exec('create table jobs (id number[], name string)')
 
 		query = 'create table products (id number, name string, photo string, description string)'
 		self._db.exec(query)
@@ -34,18 +40,37 @@ class TestDB(unittest.TestCase):
 		value = self._db.exec('select id from products where id == 2')
 		self.assertEqual(2, value[0]['id'])
 
+		with self.assertRaisesRegex(Exception, 'Column "%s" does not exists in "%s"' % ('column', 'products')):
+			self._db.exec('select column from products')
+
 	def test_table_exception(self):
-		with self.assertRaisesRegex(type(Exception()), 'Table does not exists'):
+		with self.assertRaisesRegex(Exception, 'Table does not exists'):
+			self._db.exec('show create table products')
+
+		with self.assertRaisesRegex(Exception, 'Table does not exists'):
 			self._db.exec('insert into products values (1, CocaCola, base64, good)')
 
-		with self.assertRaisesRegex(type(Exception()), 'Table does not exists'):
+		with self.assertRaisesRegex(Exception, 'Table does not exists'):
 			self._db.exec('select * from products')
 
-		with self.assertRaisesRegex(type(Exception()), 'Table does not exists'):
+		with self.assertRaisesRegex(Exception, 'Table does not exists'):
 			self._db.exec('delete from products where id > 5')
 
-		with self.assertRaisesRegex(type(Exception()), 'Table does not exists'):
+		with self.assertRaisesRegex(Exception, 'Table does not exists'):
 			self._db.exec('update products set id = 1 where id > 5')
+
+	def test_condition_exception(self):
+		query = 'create table products (id number, name string, photo string, description string)'
+		self._db.exec(query)
+
+		self._db.exec('insert into products values (1, CocaCola, base64, good)')
+		self._db.exec('insert into products values (2, Pepsi, base64, bad)')
+
+		with self.assertRaisesRegex(Exception, 'Column "%s" does not exists in "%s"' % ('external_id', 'products')):
+			self._db.exec('update products set id = 1 where external_id > 5')
+
+		with self.assertRaisesRegex(ValueError, '"%s" must be type of "%s"' % ('five', type(1))):
+			self._db.exec('update products set id = 1 where id > five')
 
 	def test_delete(self):
 		self._db.exec('create table products (id number)')
