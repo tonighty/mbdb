@@ -1,4 +1,5 @@
 import shutil
+import webbrowser
 
 from mbdb.mbdb import mbdb
 import unittest
@@ -8,6 +9,19 @@ class TestDB(unittest.TestCase):
 
 	def setUp(self):
 		self._db = mbdb('test-db')
+
+	def test_parser(self):
+		with self.assertRaises(SyntaxError):
+			self._db.exec('create create table users (id number)')
+
+		with self.assertRaises(SyntaxError):
+			self._db.exec('create table users (id numbers, name strings)')
+
+		with self.assertRaises(SyntaxError):
+			self._db.exec('create show table users (id number, name string)')
+
+		with self.assertRaises(SyntaxError):
+			self._db.exec('create show users')
 
 	def test_show_create_table(self):
 		query = 'create table users (id number, name string)'
@@ -28,11 +42,13 @@ class TestDB(unittest.TestCase):
 		query = 'create table products (id number, name string, photo string, description string)'
 		self._db.exec(query)
 
-		self._db.exec('insert into products values (1, CocaCola, base64, good)')
-		self._db.exec('insert into products values (2, Pepsi, base64, bad)')
+		self._db.exec('insert into products values (1, "CocaCola", "https://cs7.pikabu.ru/post_img/big/2019/04/21/8/155585197917460600.jpg", "good")')
+		self._db.exec('insert into products values (2, "Pepsi", "base64", "bad")')
 
-		value = self._db.exec('select id from products')
+		value = self._db.exec('select * from products')
 		self.assertEqual(1, value[0]['id'])
+
+		webbrowser.open(value[0]['photo'])
 
 		value = self._db.exec('select name from products')
 		self.assertEqual('CocaCola', value[0]['name'])
@@ -48,7 +64,7 @@ class TestDB(unittest.TestCase):
 			self._db.exec('show create table products')
 
 		with self.assertRaisesRegex(Exception, 'Table does not exists'):
-			self._db.exec('insert into products values (1, CocaCola, base64, good)')
+			self._db.exec('insert into products values (1, "CocaCola", "base64", "good")')
 
 		with self.assertRaisesRegex(Exception, 'Table does not exists'):
 			self._db.exec('select * from products')
@@ -63,14 +79,14 @@ class TestDB(unittest.TestCase):
 		query = 'create table products (id number, name string, photo string, description string)'
 		self._db.exec(query)
 
-		self._db.exec('insert into products values (1, CocaCola, base64, good)')
-		self._db.exec('insert into products values (2, Pepsi, base64, bad)')
+		self._db.exec('insert into products values (1, "CocaCola", "https://cs7.pikabu.ru/post_img/big/2019/04/21/8/155585197917460600.jpg", "good")')
+		self._db.exec('insert into products values (2, "Pepsi", "base64", "bad")')
 
 		with self.assertRaisesRegex(Exception, 'Column "%s" does not exists in "%s"' % ('external_id', 'products')):
 			self._db.exec('update products set id = 1 where external_id > 5')
 
 		with self.assertRaisesRegex(ValueError, '"%s" must be type of "%s"' % ('five', type(1))):
-			self._db.exec('update products set id = 1 where id > five')
+			self._db.exec('update products set id = 1 where id > "five"')
 
 	def test_delete(self):
 		self._db.exec('create table products (id number)')

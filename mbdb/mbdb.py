@@ -87,7 +87,7 @@ class mbdb():
 		return self._read_json(self._get_table_path(name))
 
 	def _check_column(self, name, column):
-		if column is None:
+		if column is None or column == '*':
 			return
 
 		data = self._read_meta()
@@ -179,7 +179,7 @@ class mbdb():
 
 		data = self._read_table(name)
 
-		if columns == '*':
+		if columns[0] == '*':
 			return data
 
 		result = []
