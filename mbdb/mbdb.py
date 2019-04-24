@@ -1,11 +1,10 @@
 import json
 import os
-import sys
-from mbdb.sqlparser import parse
+import tempfile
 
-sys.path.insert(0, "../..")
+from .sqlparser import parse
 
-DEFAULT_DB_PATH = os.path.join('mbdb-db')
+DEFAULT_DB_PATH = tempfile.mkdtemp()
 
 
 class mbdb():

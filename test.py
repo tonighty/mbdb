@@ -1,7 +1,7 @@
 import shutil
 import webbrowser
 
-from mbdb.mbdb import mbdb
+from mbdb import mbdb
 import unittest
 
 
