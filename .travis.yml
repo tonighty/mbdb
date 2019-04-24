@@ -1,7 +1,14 @@
 language: python
 python:
-  - "3.6"
+- '3.6'
 install:
-  - python setup.py install
+- python setup.py install
 script:
-  - python -m unittest discover
+- python -m unittest discover
+deploy:
+  provider: pypi
+  user: majorov
+  password:
+    secure: IxugS9Bx00/5+5ysj2vbRloNTLYj1phAxo1AuN0aQc2uxIsUjwTW4LPzPVTBbSOHM/WPYiyHni/Dbdlac7vLD5UjMdDCn9FRfzcrI4iMP0TNYjaKVThcuSaYZDsF3qQFl0qdzn/9aFBgzdmwB1KUlgklNIt4Zlk4LEEzMVKME6nkkMoCS9UCtK/IS3z9/KkpeHAju6mU6lg/+gUIaKPJfm7/8JIpEleqKfv4EW77KTlT86CZcYSAHgW4x/oq0kzMq4RyqSWBZDC+maWxMkKrkVAtlvItGSJ36/V0N4+pvOmaGVi/8Eq1Ge9Sw8MynjmZpWXgyk5mQffETx915b9HO/pPmZk+p0eX3+GeL0sdvrdP00umIvna8e5u4Q1brpzk2pfR2I+7n6l/2LrGLNtYXWEzqti/jWrROntu7WhCdkp2aFhkfKcDf3LiyZRJnwGmkknUUJn0UsWMW4cKzYbReP5MMVVzooS/70kmu24seiPSozQLdrcU/2Ch3EjTd9OpNJ63mxx5dMWq+zoFeF4d118hCIga0xHSIreHU7AEEybYM1Q2K4o29PqNM/WtUArEVqcYbw4MkPc1qbftqjClH4f9hy0cWL87sK0GMuRJ6sUuK17xWMzRKnazxXma9coHk7R2mmXpzMasPUDF5HTYLUm3dnSPwnHSNfpTXQpRINc=
+  on:
+    branch: master

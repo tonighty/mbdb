@@ -1,5 +1,5 @@
 import shutil
-import webbrowser
+# import webbrowser
 
 from mbdb import mbdb
 import unittest
@@ -48,7 +48,7 @@ class TestDB(unittest.TestCase):
 		value = self._db.exec('select * from products')
 		self.assertEqual(1, value[0]['id'])
 
-		webbrowser.open(value[0]['photo'])
+		# webbrowser.open(value[0]['photo'])
 
 		value = self._db.exec('select name from products')
 		self.assertEqual('CocaCola', value[0]['name'])
