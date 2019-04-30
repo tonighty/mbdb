@@ -1,7 +1,7 @@
 import shutil
 # import webbrowser
 
-from mbdb import mbdb
+from mbdb import mbdb, mbdbServer
 import unittest
 
 
@@ -107,6 +107,36 @@ class TestDB(unittest.TestCase):
 		self._db.exec('update products set id = 1 where id > 5')
 
 		self.assertEqual(len(self._db.exec('select id from products where id == 1')), 5)
+
+	def test_transaction(self):
+		self._db.exec('create table products (id number)')
+
+		self._db.begin_transaction()
+		for i in range(10):
+			self._db.exec('insert into products values (%d)' % i)
+		self._db.commit()
+
+		self.assertEqual(self._db.exec('select * from products')[0]['id'], 0)
+
+		self._db.exec('create table users (id number)')
+
+		self._db.begin_transaction()
+		for i in range(10):
+			self._db.exec('insert into users values (%d)' % i)
+		with self.assertRaisesRegex(ValueError, '"%s" must be type of "%s"' % ('five', type(1))):
+			self._db.exec('update users set id = 1 where id > "five"')
+		self._db.commit()
+
+		self.assertEqual(len(self._db.exec('select * from users')), 0)
+
+	# def test_socket(self):
+	# 	srv = mbdbServer()
+	# 	srv.run()
+	#
+	# 	db = mbdb('srv', type = 'client')
+	# 	db.exec('create table users (id number)')
+	# 	db.exec('insert into users values (0)')
+	# 	self.assertEqual(db.exec('select * from users')[0]['id'], 0)
 
 	def tearDown(self):
 		shutil.rmtree(self._db.get_database_path())

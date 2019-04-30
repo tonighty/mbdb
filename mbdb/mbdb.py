@@ -1,28 +1,55 @@
 import json
 import os
+import pickle
+import shutil
+import socket
 import tempfile
 
-from .sqlparser import parse
+from mbdb.sqlparser import parse
 
 DEFAULT_DB_PATH = tempfile.mkdtemp()
 
 
-class mbdb():
+class mbdb:
 
-	def __init__(self, name, path = DEFAULT_DB_PATH):
+	def __init__(self, name, path = DEFAULT_DB_PATH, type = 'local', host = '127.0.0.1', port = 65432):
+		self._db_name = name
+		self.type = type
+
+		if type == 'client':
+			self.host = host
+			self.port = port
+			return
 
 		self._db_path = path
 		if not os.path.exists(self._db_path):
 			os.mkdir(self._db_path)
 
-		self._db_name = name
 		self._meta_path = os.path.join(self._db_path, self._db_name, '_META.json')
 		self._create_database()
+
+		self._is_transaction = False
+		self._temp_tables = {}
 
 	def get_database_path(self):
 		return self._db_path
 
+	def begin_transaction(self):
+		self._is_transaction = True
+
+	def commit(self):
+		if not self._is_transaction:
+			return
+
+		for name, path in self._temp_tables.items():
+			os.remove(path)
+			os.replace(path, self._get_table_path(name, False, False))
+		self._is_transaction = False
+
 	def exec(self, statement):
+		if self.type == 'client':
+			return self._send_socket(statement)
+
 		self._check_for_db()
 
 		sql = parse(statement)
@@ -53,7 +80,7 @@ class mbdb():
 
 	def _check_for_db(self):
 		if not self._db_name:
-			raise Exception('Database does not exist')
+			return self._handle_error(Exception('Database does not exist'))
 
 	def _is_legal_table(self, name):
 		data = self._read_meta()
@@ -65,12 +92,19 @@ class mbdb():
 
 	def _check_table_readability(self, name):
 		if not self._is_legal_table(name):
-			raise Exception('Table does not exists')
+			return self._handle_error(Exception('Table does not exists'))
 
 		if not self._is_legal_file(self._get_table_path(name)):
 			return None
 
-	def _get_table_path(self, name):
+	def _get_table_path(self, name, is_changed = False, original = True):
+		if self._is_transaction and not original:
+			if name in self._temp_tables:
+				return self._temp_tables[name]
+			elif is_changed:
+				self._temp_tables[name] = os.path.join(tempfile.gettempdir(), name)
+				open(self._temp_tables[name], 'w').close()
+				return self._temp_tables[name]
 		return os.path.join(self._db_path, self._db_name, name + '.json')
 
 	def _read_json(self, path):
@@ -96,8 +130,7 @@ class mbdb():
 					if field['name'] == column:
 						return
 
-		raise Exception('Column "%s" does not exists in "%s"' % (column, name))
-
+		return self._handle_error(Exception('Column "%s" does not exists in "%s"' % (column, name)))
 
 	@staticmethod
 	def _is_legal_file(path):
@@ -113,7 +146,7 @@ class mbdb():
 
 		for table in data:
 			if table['table_name'] == name:
-				raise Exception('Table already exists')
+				return self._handle_error(Exception('Table already exists'))
 
 		new_data = {
 			'table_name': name,
@@ -138,11 +171,9 @@ class mbdb():
 				return str('create table ' + name + ' (' + ', '.join(
 					[' '.join(list(i.values())) for i in table['columns']]) + ')')
 
-		raise Exception('Table does not exists')
+		return self._handle_error(Exception('Table does not exists'))
 
 	def _insert_into_table(self, name, fields):
-		table_path = self._get_table_path(name)
-
 		data_structure = None
 		data = self._read_meta()
 		for table in data:
@@ -150,7 +181,7 @@ class mbdb():
 				data_structure = table['columns']
 
 		if data_structure is None:
-			raise Exception('Table does not exists')
+			return self._handle_error(Exception('Table does not exists'))
 
 		table_data = self._read_table(name)
 
@@ -160,6 +191,7 @@ class mbdb():
 				fields[index] = int(fields[index])
 			new_data.update({list(item.values())[0]: fields[index]})
 
+		table_path = self._get_table_path(name, True)
 		with open(table_path, 'w') as table_file:
 			if isinstance(table_data, list):
 				table_data.append(new_data)
@@ -199,10 +231,9 @@ class mbdb():
 		if condition is not None:
 			self._check_column(name, condition[0])
 
-		table_path = self._get_table_path(name)
-
 		data = self._read_table(name)
 
+		table_path = self._get_table_path(name, True)
 		with open(table_path, 'w') as table_file:
 			column = condition[0]
 			operator = condition[1]
@@ -220,10 +251,9 @@ class mbdb():
 		if condition is not None:
 			self._check_column(name, condition[0])
 
-		table_path = self._get_table_path(name)
-
 		data = self._read_table(name)
 
+		table_path = self._get_table_path(name, True)
 		with open(table_path, 'w') as table_file:
 			column = condition[0]
 			operator = condition[1]
@@ -237,8 +267,15 @@ class mbdb():
 
 			json.dump(data, table_file, ensure_ascii = False)
 
-	@staticmethod
-	def _handle_condition(value1, operator, value2):
+	def _handle_error(self, exception):
+		self._is_transaction = False
+		
+		if self.type == 'server':
+			return exception
+		
+		raise exception
+
+	def _handle_condition(self, value1, operator, value2):
 		try:
 			if operator == '==':
 				return value1 == type(value1)(value2)
@@ -258,4 +295,10 @@ class mbdb():
 			elif operator == '<=':
 				return value1 <= type(value1)(value2)
 		except ValueError:
-			raise ValueError('"%s" must be type of "%s"' % (value2, type(value1)))
+			return self._handle_error(ValueError('"%s" must be type of "%s"' % (value2, type(value1))))
+
+	def _send_socket(self, statement):
+		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+			s.connect((self.host, self.port))
+			s.sendall(statement.encode())
+			return pickle.loads(s.recv(1024))
