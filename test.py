@@ -1,8 +1,10 @@
 import shutil
 # import webbrowser
+import threading
+import time
+import unittest
 
 from mbdb import mbdb, mbdbServer
-import unittest
 
 
 class TestDB(unittest.TestCase):
@@ -129,14 +131,21 @@ class TestDB(unittest.TestCase):
 
 		self.assertEqual(len(self._db.exec('select * from users')), 0)
 
-	# def test_socket(self):
-	# 	srv = mbdbServer()
-	# 	srv.run()
-	#
-	# 	db = mbdb('srv', type = 'client')
-	# 	db.exec('create table users (id number)')
-	# 	db.exec('insert into users values (0)')
-	# 	self.assertEqual(db.exec('select * from users')[0]['id'], 0)
+	def test_socket(self):
+		srv = mbdbServer()
+		server_thread = threading.Thread(target = srv.run)
+		server_thread.start()
+
+		time.sleep(1)
+
+		db = mbdb('srv', type = 'client')
+		db.exec('create table users (id number)')
+		db.exec('insert into users values (0)')
+		self.assertEqual(db.exec('select * from users')[0]['id'], 0)
+
+		db.exec('killsrv')
+
+		server_thread.join()
 
 	def tearDown(self):
 		shutil.rmtree(self._db.get_database_path())

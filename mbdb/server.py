@@ -20,9 +20,8 @@ class mbdbServer:
 				conn, addr = s.accept()
 				with conn:
 					data = conn.recv(4096).decode()
-					res = pickle.dumps(self._db.exec(data))
+					if data == 'killsrv':
+						conn.sendall(pickle.dumps('server is down now'))
+						return 0
 
-					if isinstance(res, Exception):
-						raise res
-					else:
-						return res
+					conn.sendall(pickle.dumps(self._db.exec(data)))

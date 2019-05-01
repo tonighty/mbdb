@@ -1,7 +1,6 @@
 import json
 import os
 import pickle
-import shutil
 import socket
 import tempfile
 
@@ -301,4 +300,8 @@ class mbdb:
 		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 			s.connect((self.host, self.port))
 			s.sendall(statement.encode())
-			return pickle.loads(s.recv(1024))
+			data = pickle.loads(s.recv(1024))
+			if isinstance(data, Exception):
+				raise data
+			else:
+				return data
