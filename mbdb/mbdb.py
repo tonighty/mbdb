@@ -1,7 +1,9 @@
 import json
 import os
 import pickle
+import random
 import socket
+import string
 import tempfile
 
 from mbdb.sqlparser import parse
@@ -11,13 +13,17 @@ DEFAULT_DB_PATH = tempfile.mkdtemp()
 
 class mbdb:
 
-	def __init__(self, name, path = DEFAULT_DB_PATH, type = 'local', host = '127.0.0.1', port = 65432):
+	def __init__(self, name, path = DEFAULT_DB_PATH, type = 'local', host = '127.0.0.1', port = 65432, token = None):
 		self._db_name = name
 		self.type = type
 
 		if type == 'client':
 			self.host = host
 			self.port = port
+			if token is None:
+				self._handle_error(Exception('Token is required'))
+			self._token = token
+			self._is_transaction = False
 			return
 
 		self._db_path = path
@@ -27,25 +33,55 @@ class mbdb:
 		self._meta_path = os.path.join(self._db_path, self._db_name, '_META.json')
 		self._create_database()
 
-		self._is_transaction = False
+		self._is_transaction = False if type != 'server' else {}
 		self._temp_tables = {}
+
+		self._token = None
 
 	def get_database_path(self):
 		return self._db_path
 
 	def begin_transaction(self):
-		self._is_transaction = True
+		if self.type == 'server':
+			self._is_transaction[self._token] = True
+		elif self.type == 'client':
+			return self._send_socket('begin_transaction')
+		else:
+			self._is_transaction = True
 
 	def commit(self):
-		if not self._is_transaction:
-			return
+		if self.type == 'local' and not self._is_transaction:
+			return True
 
-		for name, path in self._temp_tables.items():
-			os.remove(path)
-			os.replace(path, self._get_table_path(name, False, False))
-		self._is_transaction = False
+		if self.type == 'client':
+			return self._send_socket('commit')
 
-	def exec(self, statement):
+		if self.type == 'server':
+			items = self._temp_tables[self._token].items()
+		else:
+			items = self._temp_tables.items()
+		for name, path in items:
+			# os.remove(path)
+			os.replace(path, self._get_table_path(name, False, True))
+
+		if self.type == 'server':
+			self._is_transaction[self._token] = False
+		else:
+			self._is_transaction = False
+
+		return True
+
+	def exec(self, statement, token = None):
+		if token is not None:
+			self._token = token
+			if self._token not in self._is_transaction:
+				self._is_transaction[self._token] = False
+
+		if statement == 'begin_transaction':
+			return self.begin_transaction()
+		elif statement == 'commit':
+			return self.commit()
+
 		if self.type == 'client':
 			return self._send_socket(statement)
 
@@ -97,13 +133,26 @@ class mbdb:
 			return None
 
 	def _get_table_path(self, name, is_changed = False, original = True):
-		if self._is_transaction and not original:
-			if name in self._temp_tables:
-				return self._temp_tables[name]
-			elif is_changed:
-				self._temp_tables[name] = os.path.join(tempfile.gettempdir(), name)
-				open(self._temp_tables[name], 'w').close()
-				return self._temp_tables[name]
+		if not original:
+			if self.type == 'server' and self._is_transaction[self._token]:
+				if self._token in self._temp_tables and name in self._temp_tables[self._token]:
+					return self._temp_tables[self._token][name]
+				elif is_changed:
+					self._temp_tables[self._token] = {}
+					self._temp_tables[self._token][name] = os.path.join(tempfile.gettempdir(),
+					                                                    ''.join(random.choices(string.ascii_uppercase + string.digits, k = 10)))
+					open(self._temp_tables[self._token][name], 'wb').close()
+					return self._temp_tables[self._token][name]
+
+			elif self.type != 'server' and self._is_transaction:
+				if name in self._temp_tables:
+					return self._temp_tables[name]
+				elif is_changed:
+					self._temp_tables[name] = os.path.join(tempfile.gettempdir(),
+					                                       ''.join(random.choices(string.ascii_uppercase + string.digits, k = 10)))
+					open(self._temp_tables[name], 'wb').close()
+					return self._temp_tables[name]
+
 		return os.path.join(self._db_path, self._db_name, name + '.json')
 
 	def _read_json(self, path):
@@ -115,8 +164,8 @@ class mbdb:
 	def _read_meta(self):
 		return self._read_json(self._meta_path)
 
-	def _read_table(self, name):
-		return self._read_json(self._get_table_path(name))
+	def _read_table(self, name, original = False):
+		return self._read_json(self._get_table_path(name, original = original))
 
 	def _check_column(self, name, column):
 		if column is None or column == '*':
@@ -190,7 +239,7 @@ class mbdb:
 				fields[index] = int(fields[index])
 			new_data.update({list(item.values())[0]: fields[index]})
 
-		table_path = self._get_table_path(name, True)
+		table_path = self._get_table_path(name, True, False)
 		with open(table_path, 'w') as table_file:
 			if isinstance(table_data, list):
 				table_data.append(new_data)
@@ -207,7 +256,7 @@ class mbdb:
 		for column in columns:
 			self._check_column(name, column)
 
-		data = self._read_table(name)
+		data = self._read_table(name, original = False)
 
 		if columns[0] == '*':
 			return data
@@ -268,10 +317,11 @@ class mbdb:
 
 	def _handle_error(self, exception):
 		self._is_transaction = False
-		
+		self._temp_tables = {}
+
 		if self.type == 'server':
 			return exception
-		
+
 		raise exception
 
 	def _handle_condition(self, value1, operator, value2):
@@ -299,7 +349,7 @@ class mbdb:
 	def _send_socket(self, statement):
 		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 			s.connect((self.host, self.port))
-			s.sendall(statement.encode())
+			s.sendall(pickle.dumps([statement, self._token]))
 			data = pickle.loads(s.recv(1024))
 			if isinstance(data, Exception):
 				raise data

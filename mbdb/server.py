@@ -19,9 +19,15 @@ class mbdbServer:
 			while True:
 				conn, addr = s.accept()
 				with conn:
-					data = conn.recv(4096).decode()
-					if data == 'killsrv':
+					data = pickle.loads(conn.recv(4096))
+					if data[0] == 'begin_transaction':
+						self._db.exec('begin_transaction', token = data[1])
+						conn.sendall(pickle.dumps(True))
+					elif data[0] == 'commit':
+						self._db.exec('commit', token = data[1])
+						conn.sendall(pickle.dumps(True))
+					elif data[0] == 'killsrv':
 						conn.sendall(pickle.dumps('server is down now'))
 						return 0
-
-					conn.sendall(pickle.dumps(self._db.exec(data)))
+					else:
+						conn.sendall(pickle.dumps(self._db.exec(data[0], token = data[1])))

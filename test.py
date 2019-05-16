@@ -138,10 +138,18 @@ class TestDB(unittest.TestCase):
 
 		time.sleep(1)
 
-		db = mbdb('srv', type = 'client')
+		db = mbdb('srv', type = 'client', token = '123')
 		db.exec('create table users (id number)')
 		db.exec('insert into users values (0)')
-		self.assertEqual(db.exec('select * from users')[0]['id'], 0)
+		self.assertEqual(len(db.exec('select * from users')), 1)
+
+		db2 = mbdb('srv', type = 'client', token = '321')
+		db2.begin_transaction()
+		db2.exec('insert into users values (1)')
+		self.assertEqual(len(db.exec('select * from users')), 1)
+		self.assertEqual(len(db2.exec('select * from users')), 2)
+		db2.commit()
+		self.assertEqual(len(db.exec('select * from users')), 2)
 
 		db.exec('killsrv')
 
